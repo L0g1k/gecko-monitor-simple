@@ -3,13 +3,16 @@
 
 define([
     "dojo/_base/declare",
-    "lib/knockout-3.0.0"
-], function(declare, ko){
+    "knockout",
+    "./model/Trader"
+], function(declare, ko, Trader){
     return declare(null, {
 
 
         accountBalance: ko.observable("Loading..."),
         startStopLabel: ko.observable(),
+        traders: ko.observableArray([]),
+        positions: ko.observableArray([]),
         _started: ko.observable(false),
         _connected: ko.observable(false),
         ws: null,
@@ -26,6 +29,10 @@ define([
 
             this.connectToServer();
 
+            this.positions.subscribe(function(positions){
+                console.debug("I now have " + positions.length + " positions");
+            })
+
             ko.applyBindings(this);
 
         },
@@ -33,11 +40,16 @@ define([
         onmessage: function(m) {
             var payload = JSON.parse(m.data);
             console.log(payload);
-            for(var key in payload) {
-                if(payload.hasOwnProperty(key)) {
-                    this[key](payload[key])
+            if(typeof payload == "string") {
+                new Function("this." + payload).call(this);
+            } else {
+                for(var key in payload) {
+                    if(payload.hasOwnProperty(key)) {
+                        this[key](payload[key])
+                    }
                 }
             }
+
         },
 
         startStop: function() {
