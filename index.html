@@ -69,7 +69,10 @@
                                 <li class="list-group-item">
                                     <table width="100%">
                                         <tr>
-                                            <td><span data-bind="text: name"></span></td>
+                                            <td>
+                                                <span data-bind="text: name"></span>
+                                                <span class="badge" data-bind="text: positions().length"></span>
+                                            </td>
                                             <td><button type="button" class="btn btn-default pull-right">Pause</button></td>
                                         </tr>
                                     </table>

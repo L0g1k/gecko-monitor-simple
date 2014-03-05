@@ -12,6 +12,7 @@ define([
         accountBalance: ko.observable("Loading..."),
         startStopLabel: ko.observable(),
         traders: ko.observableArray([]),
+        _traders: ko.observableArray([]),
         positions: ko.observableArray([]),
         _started: ko.observable(false),
         _connected: ko.observable(false),
@@ -23,18 +24,41 @@ define([
                 return this._started() ? "Stop" : "Start"
             }, this)
 
-            this._started.subscribe(function(started){
-                this.sendMessage(started ? "start" : "stop")
-            }, this)
-
             this.connectToServer();
 
-            this.positions.subscribe(function(positions){
-                console.debug("I now have " + positions.length + " positions");
-            })
+            this.positions.subscribe(dojo.hitch(this, "_syncPositions"))
+            this._traders.subscribe(dojo.hitch(this, "_syncTraders"))
 
             ko.applyBindings(this);
 
+
+
+            window.app = this;
+
+        },
+
+        startStop: function() {
+            this.sendMessage(this._started() ? "stop" : "start")
+        },
+
+        _syncTraders: function(traders){
+            this.traders(traders.map(function(data){
+                return new Trader(data);
+            }))
+        },
+
+
+        _syncPositions: function(positions){
+            this.traders().forEach(function(trader){
+                var _positions = []
+                positions.forEach(function(position){
+                    if(position.instrumentID == trader.instrumentID()) {
+                        _positions.push(position)
+                    }
+                })
+                trader.positions(_positions);
+            })
+            console.debug("I now have " + positions.length + " positions");
         },
 
         onmessage: function(m) {
@@ -50,10 +74,6 @@ define([
                 }
             }
 
-        },
-
-        startStop: function() {
-            this._started(!this._started());
         },
 
         sendMessage: function(message) {

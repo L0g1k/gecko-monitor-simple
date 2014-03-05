@@ -13,6 +13,7 @@ define(["dojo/_base/declare", "knockout", "knockout-mapping", "jquery"],
         strategy: null,
         constructor: function(data) {
             declare.safeMixin(this, mapping.fromJS(data));
+            this.positions = ko.observableArray([]);
         }
     })
 
