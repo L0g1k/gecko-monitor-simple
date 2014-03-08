@@ -4,8 +4,9 @@
 define([
     "dojo/_base/declare",
     "knockout",
+    "dojo/topic",
     "./model/Trader"
-], function(declare, ko, Trader){
+], function(declare, ko, topic, Trader){
     return declare(null, {
 
 
@@ -16,7 +17,13 @@ define([
         positions: ko.observableArray([]),
         _started: ko.observable(false),
         _connected: ko.observable(false),
+        _socketReady: $.Deferred(),
+
         ws: null,
+
+        constructor: function() {
+            window.app = this; // debug only
+        },
 
         init: function(){
 
@@ -24,6 +31,7 @@ define([
                 return this._started() ? "Stop" : "Start"
             }, this)
 
+            this.events();
             this.connectToServer();
 
             this.positions.subscribe(dojo.hitch(this, "_syncPositions"))
@@ -32,9 +40,36 @@ define([
             ko.applyBindings(this);
 
 
+        },
 
-            window.app = this;
+        events: function() {
+            var socketReady = this._socketReady;
+            topic.subscribe("command", function(){
+                var details = arguments;
+                socketReady.then(function(websocket){
+                    var send = details[0]
+                    send += "(";
+                    for (var i = 1; i < details.length; i++) {
+                        var arg = details[i];
+                        send += arg;
+                        if(i != details.length) {
+                            send += ")";
+                        }
+                    }
+                    websocket.send(send);
+                })
+            })
+        },
 
+        getTraderById: function (id) {
+            var filter = this.traders().filter(function (trader) {
+                return trader.id() == id
+            });
+            return filter.length ? filter[0] : null;
+        },
+
+        setTraderProperty: function(id, property, value) {
+            this.getTraderById(id)[property](value);
         },
 
         startStop: function() {
@@ -46,7 +81,6 @@ define([
                 return new Trader(data);
             }))
         },
-
 
         _syncPositions: function(positions){
             this.traders().forEach(function(trader){
@@ -65,7 +99,11 @@ define([
             var payload = JSON.parse(m.data);
             console.log(payload);
             if(typeof payload == "string") {
-                new Function("this." + payload).call(this);
+                try {
+                    new Function("this." + payload).call(this);
+                } catch (e) {
+                    console.warn("Couldn't process string: " + m.data, e.stack);
+                }
             } else {
                 for(var key in payload) {
                     if(payload.hasOwnProperty(key)) {
@@ -73,7 +111,6 @@ define([
                     }
                 }
             }
-
         },
 
         sendMessage: function(message) {
@@ -81,11 +118,13 @@ define([
         },
 
         connectToServer: function () {
+
             this.ws = new WebSocket("ws://localhost:9000");
             this.ws.onmessage = dojo.hitch(this, "onmessage")
             this.ws.onopen = function () {
                 this.sendMessage("init");
                 this._connected(true);
+                this._socketReady.resolve(this.ws);
                 console.debug("Monitor connected");
             }.bind(this)
             this.ws.onclose = function() {
